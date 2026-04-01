@@ -1,0 +1,20 @@
+# Large runtime artifacts — do NOT commit these
+frames/*
+!frames/.gitkeep
+sparse/*
+!sparse/.gitkeep
+database.db
+uploads/*.mp4
+uploads/*.mov
+uploads/*.avi
+uploads/*.mkv
+
+# Logs (optional: keep the log dir but not the log files)
+logs/*.log
+
+# System files
+.DS_Store
+Thumbs.db
+*.swp
+__pycache__/
+*.pyc
