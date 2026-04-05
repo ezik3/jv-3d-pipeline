@@ -14,18 +14,18 @@ echo "  JV 3D Pipeline — Boot"
 echo "======================================"
 
 # —— 1. Install system dependencies ——————————————————————————
-echo "[1/5] Installing dependencies..."
+echo "[1/6] Installing dependencies..."
 apt-get update -qq
 apt-get install -y ffmpeg colmap sqlite3 git > /dev/null 2>&1
 echo "      ✔ ffmpeg, colmap, sqlite3, git installed"
 
 # —— 2. Install Python dependencies ——————————————————————————
-echo "[2/5] Installing Python packages..."
+echo "[2/6] Installing Python packages..."
 pip install -q fastapi uvicorn python-multipart
 echo "      ✔ Python packages installed"
 
 # —— 3. Clone or update repo —————————————————————————————————
-echo "[3/5] Setting up repo..."
+echo "[3/6] Setting up repo..."
 cd /workspace
 
 if [ ! -d "$REPO_DIR" ]; then
@@ -40,30 +40,38 @@ fi
 cd "$REPO_DIR"
 
 # —— 4. Set permissions ——————————————————————————————————————
-echo "[4/5] Setting permissions..."
+echo "[4/6] Setting permissions..."
 chmod +x boot.sh run_pipeline.sh scripts/*.sh
 echo "      ✔ Scripts executable"
 
 # —— 5. Create required folders ——————————————————————————————
-echo "[5/5] Creating folders..."
-mkdir -p uploads frames sparse logs
+echo "[5/6] Creating folders..."
+mkdir -p uploads frames sparse logs output/gaussian
 echo "      ✔ Folders ready"
 
-# —— 6. Set headless env vars ————————————————————————————————
+# —— 6. Set env vars + git identity ——————————————————————————
+echo "[6/6] Setting environment..."
+
 export QT_QPA_PLATFORM=offscreen
 export DISPLAY=""
 export CUDA_VISIBLE_DEVICES=""
 
-# Persist for this session
 echo 'export QT_QPA_PLATFORM=offscreen' >> ~/.bashrc
 echo 'export DISPLAY=""' >> ~/.bashrc
 echo 'export CUDA_VISIBLE_DEVICES=""' >> ~/.bashrc
+
+git config --global user.email "eziteezi@gmail.com"
+git config --global user.name "Ezi"
+
+echo "      ✔ Env vars set"
+echo "      ✔ Git identity set"
 
 echo ""
 echo "======================================"
 echo "  ✔ Boot complete!"
 echo ""
 echo "  Next steps:"
-echo "  1. Upload your video to: $REPO_DIR/uploads/"
-echo "  2. Run: cd $REPO_DIR && ./run_pipeline.sh"
+echo "  1. Upload video to: $REPO_DIR/uploads/"
+echo "  2. Run pipeline:    ./run_pipeline.sh"
+echo "  3. After success:   ./scripts/08_gaussian_splat.sh"
 echo "======================================"
