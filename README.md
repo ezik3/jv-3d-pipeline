@@ -1,81 +1,109 @@
-# JV-3D COLMAP Reconstruction Pipeline
+# JV 3D Pipeline
 
-A fully automated, headless, CPU-only COLMAP sparse reconstruction pipeline for video input.
+Automated video → COLMAP → 3D reconstruction pipeline for JointVibe venues.
 
-## Environment
+---
 
-- **Platform**: Linux (RunPod or similar)
-- **GPU**: Not required — all steps run on CPU
-- **Display**: Not required — Qt runs in offscreen mode
+## Every time you start a new RunPod pod
 
-## Prerequisites
-
+### Step 1 — Boot (one time per pod)
 ```bash
-# Ubuntu / Debian
-sudo apt-get update
-sudo apt-get install -y colmap ffmpeg sqlite3
+curl -sSL https://raw.githubusercontent.com/ezik3/jv-3d-pipeline/main/boot.sh | bash
 ```
-
-## Input
-
-Place your video at:
-```
-uploads/1 April 2026.mp4
-```
-
-## Run
-
+Or if repo is already cloned:
 ```bash
-chmod +x run_pipeline.sh scripts/*.sh
+cd /workspace/jv-3d-pipeline && bash boot.sh
+```
+
+This installs everything: ffmpeg, colmap, sqlite3, Python packages, sets env vars.
+
+---
+
+### Step 2 — Upload your video
+
+Upload **any** .mp4 or .mov file into the `uploads/` folder.  
+**No renaming required.** The pipeline auto-detects it.
+
+---
+
+### Step 3 — Run the pipeline
+```bash
+cd /workspace/jv-3d-pipeline
 ./run_pipeline.sh
 ```
 
-### Optional environment variables
+That's it. Three steps total.
 
-| Variable     | Default | Description                              |
-|--------------|---------|------------------------------------------|
-| `FRAME_FPS`  | `3`     | Frames-per-second for extraction         |
-| `MIN_FRAMES` | `200`   | Minimum frame count before aborting      |
-| `SKIP_GIT`   | `0`     | Set to `1` to skip git commit/push       |
-
-Example:
-```bash
-FRAME_FPS=4 SKIP_GIT=1 ./run_pipeline.sh
-```
+---
 
 ## Output
 
-| Path            | Contents                         |
-|-----------------|----------------------------------|
-| `frames/`       | Extracted JPEG frames            |
-| `database.db`   | COLMAP feature/match database    |
-| `sparse/0/`     | Final sparse model               |
-| `logs/pipeline.log` | Full execution log           |
+On success you will see:
+```
+sparse/0/cameras.bin
+sparse/0/images.bin
+sparse/0/points3D.bin
+```
 
-### Success criteria
+Check `logs/pipeline.log` for full output.
 
-`sparse/0/` must contain:
-- `cameras.bin`  — camera intrinsics
-- `images.bin`   — registered image poses
-- `points3D.bin` — reconstructed 3D points
+---
 
-## Pipeline Steps
+## Environment variables (optional overrides)
 
-| Script                     | Purpose                                   |
-|----------------------------|-------------------------------------------|
-| `scripts/01_setup.sh`      | Clean old artifacts, recreate dirs        |
-| `scripts/02_extract_frames.sh` | Extract frames from video via ffmpeg  |
-| `scripts/03_colmap_features.sh` | Create DB, extract SIFT features    |
-| `scripts/04_colmap_matching.sh` | Exhaustive feature matching         |
-| `scripts/05_colmap_mapper.sh`   | Incremental SfM sparse mapper       |
-| `scripts/06_validate.sh`   | Verify output files and print stats       |
-| `scripts/07_retry_if_failed.sh` | Auto-retry with relaxed params     |
+| Variable | Default | Purpose |
+|---|---|---|
+| `FRAME_FPS` | 3 | Frames per second to extract |
+| `MIN_FRAMES` | 200 | Minimum frames before retry |
+| `SKIP_GIT` | 0 | Set to 1 to skip git push |
+
+Example:
+```bash
+FRAME_FPS=5 SKIP_GIT=1 ./run_pipeline.sh
+```
+
+---
 
 ## Troubleshooting
 
-| Error                              | Fix                                        |
-|------------------------------------|--------------------------------------------|
-| `No good initial image pair found` | Increase `FRAME_FPS`, rerun               |
-| OpenGL / Qt errors                 | `QT_QPA_PLATFORM=offscreen` is set by default |
-| GPU errors                         | `SiftExtraction.use_gpu 0` is set by default |
-| Too few frames                     | Script auto-retries at fps=5               |
+**"No video file found"** — Make sure a .mp4 or .mov is in the `uploads/` folder
+
+**"No good initial image pair"** — Your video needs more parallax. Walk *around* objects, not toward them. See capture guide below.
+
+**Git push fails** — Run `SKIP_GIT=1 ./run_pipeline.sh` to skip push, set up SSH key separately
+
+---
+
+## Capture guide (critical for COLMAP to work)
+
+✅ DO:
+- Walk slowly in a circle around tables/objects
+- Move sideways, not just forward
+- Keep camera steady
+- 20–60 seconds of footage
+- Include textured objects (chairs, tables, bar)
+
+❌ DON'T:
+- Walk straight forward
+- Pan smoothly left-right only
+- Film blank walls
+- Film in motion blur
+
+---
+
+## Pipeline flow
+
+```
+boot.sh
+  └─ installs deps, clones/pulls repo, sets env vars
+
+run_pipeline.sh
+  ├─ 01_setup.sh          → clean previous run
+  ├─ 02_extract_frames.sh → video → frames (auto-detects filename)
+  ├─ [retry loop x3]
+  │    ├─ 03_colmap_features.sh  → SIFT feature extraction
+  │    ├─ 04_colmap_matching.sh  → exhaustive/sequential matching
+  │    └─ 05_colmap_mapper.sh    → sparse 3D reconstruction
+  ├─ 06_validate.sh       → verify output is valid
+  └─ git push             → commit logs back to repo
+```
